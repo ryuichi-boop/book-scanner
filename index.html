@@ -196,7 +196,7 @@
       <div id="profit-result" class="profit-display profit-plus">純利益: 0 円 (0%)</div>
     </div>
 
-    <a id="btn-mercari-link" class="btn-mercari" href="#" target="_blank">🔍 メルカリ成約相場(Sold)を1秒確認</a>
+    <a id="btn-mercari-link" class="btn-mercari" href="#" target="_blank" rel="noopener noreferrer">🔍 メルカリ成約相場(Sold)を1秒確認</a>
     <button class="btn-reset" onclick="resetAll()">✕ クリアして最初に戻る</button>
   </div>
 </div>
@@ -462,9 +462,8 @@ function manualRecalc() {
     rankEl.textContent = "D (見送り/赤字)";
   }
 
-  // メルカリURL生成（売り切れ・取引中のみに厳密固定）
+  // メルカリURL生成（ブラウザ強制 ＆ 売り切れ・取引中のみに厳密固定）
   if (scannedBooks.length > 0) {
-    // 記号（!、.など）を除去して検索ノイズをカット
     let cleanTitles = scannedBooks.map(b => {
       let t = b.title.replace(/[!！\.。、,]/g, " ").trim();
       return t.split(" ")[0];
@@ -472,8 +471,8 @@ function manualRecalc() {
     let q = cleanTitles.join(" ");
     if (scannedBooks.length > 1) q += " セット";
     
-    // status=trading_and_sold_out を指定して確実に売り切れのみを抽出
-    const mercariUrl = `https://jp.mercari.com/search?keyword=${encodeURIComponent(q)}&status=trading_and_sold_out`;
+    // アプリへの強制ディープリンクを回避し、Web版ブラウザ上で売り切れ（Sold）を確実に開くURL構造
+    const mercariUrl = `https://jp.mercari.com/search?keyword=${encodeURIComponent(q)}&status=trading_and_sold_out&item_condition_id=1&ref=web_search_filter`;
     document.getElementById("btn-mercari-link").href = mercariUrl;
   }
 }
