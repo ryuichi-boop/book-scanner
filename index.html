@@ -462,11 +462,18 @@ function manualRecalc() {
     rankEl.textContent = "D (見送り/赤字)";
   }
 
-  // メルカリURL生成 (売り切れ・取引中のみに修正済み)
+  // メルカリURL生成（売り切れ・取引中のみに厳密固定）
   if (scannedBooks.length > 0) {
-    let q = scannedBooks.map(b => b.title.split(" ")[0]).join(" ");
+    // 記号（!、.など）を除去して検索ノイズをカット
+    let cleanTitles = scannedBooks.map(b => {
+      let t = b.title.replace(/[!！\.。、,]/g, " ").trim();
+      return t.split(" ")[0];
+    });
+    let q = cleanTitles.join(" ");
     if (scannedBooks.length > 1) q += " セット";
-    const mercariUrl = `https://jp.mercari.com/search?keyword=${encodeURIComponent(q)}&status_trading_sold_out=1`;
+    
+    // status=trading_and_sold_out を指定して確実に売り切れのみを抽出
+    const mercariUrl = `https://jp.mercari.com/search?keyword=${encodeURIComponent(q)}&status=trading_and_sold_out`;
     document.getElementById("btn-mercari-link").href = mercariUrl;
   }
 }
