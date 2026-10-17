@@ -318,7 +318,7 @@ function updateUI() {
       if (diff >= 3) { isOld = true; hasOldBookWarning = true; }
     }
 
-    // 分冊キーワード検知（修正箇所）
+    // 分冊キーワード検知
     if (/(上巻|下巻|上$\vert{}下$|第\d+巻|大系|コンメンタール|分冊|[ⅠⅡⅢⅣ])/.test(book.title)) {
       hasSetKeywords = true;
     }
@@ -462,11 +462,11 @@ function manualRecalc() {
     rankEl.textContent = "D (見送り/赤字)";
   }
 
-  // メルカリURL生成 (複数冊の場合は主要キーワードでまとめ検索)
+  // メルカリURL生成 (売り切れ・取引中のみに修正済み)
   if (scannedBooks.length > 0) {
     let q = scannedBooks.map(b => b.title.split(" ")[0]).join(" ");
     if (scannedBooks.length > 1) q += " セット";
-    const mercariUrl = `https://jp.mercari.com/search?keyword=${encodeURIComponent(q)}&status=sold_out|trading`;
+    const mercariUrl = `https://jp.mercari.com/search?keyword=${encodeURIComponent(q)}&status_trading_sold_out=1`;
     document.getElementById("btn-mercari-link").href = mercariUrl;
   }
 }
