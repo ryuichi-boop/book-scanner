@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>専門書・実務書 高速査定スキャナー v4</title>
+  <!-- 無料・軽量のHTML5バーコードリーダーライブラリ -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-sub: #94a3b8;
+      --border: #334155;
+      --accent: #f59e0b;
+      --danger: #ef4444;
+      --success: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 12px; font-size: 14px; -webkit-tap-highlight-color: transparent; }
+    .container { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+    
+    .card { background-color: var(--card-bg); border-radius: 12px; padding: 14px; border: 1px solid var(--border); }
+    h2 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+    
+    input[type="text"], input[type="number"] {
+      width: 100%; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: #fff; font-size: 15px; outline: none;
+    }
+    input:focus { border-color: var(--primary); }
+    
+    .btn { background: var(--primary); color: #fff; border: none; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn:active { background: var(--primary-dark); transform: scale(0.98); }
+    .btn-block { width: 100%; padding: 12px; font-size: 15px; }
+    .btn-scanner { background: #10b981; margin-bottom: 8px; }
+    .btn-scanner:active { background: #059669; }
+    .btn-mercari { background: #ea352d; margin-top: 8px; }
+    .btn-mercari:active { background: #b91c1c; }
+
+    /* カメラプレビュー */
+    #reader-wrapper { display: none; width: 100%; margin-bottom: 10px; border-radius: 8px; overflow: hidden; border: 2px solid var(--primary); background: #000; }
+    #reader { width: 100%; }
+
+    /* チェックボックスエリア */
+    .checkbox-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; background: #0f172a; padding: 10px; border-radius: 8px; border: 1px solid var(--border); }
+    .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; user-select: none; }
+    .checkbox-label input { width: 16px; height: 16px; accent-color: var(--primary); }
+    .danger-check { color: #f87171; }
+    .safe-check { color: #34d399; font-weight: bold; }
+
+    /* 結果カード */
+    .result-box { display: none; flex-direction: column; gap: 10px; }
+    .badge-row { display: flex; gap: 8px; align-items: center; }
+    .badge { padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 700; }
+    .rank-S { background: #8b5cf6; color: #fff; }
+    .rank-A { background: var(--success); color: #fff; }
+    .rank-B { background: var(--accent); color: #000; }
+    .rank-D { background: var(--danger); color: #fff; }
+
+    .book-meta { background: #0f172a; padding: 10px; border-radius: 8px; font-size: 13px; line-height: 1.6; }
+    .book-meta b { color: #38bdf8; }
+
+    .warning-box { background: rgba(239, 68, 68, 0.15); border: 1px solid var(--danger); border-radius: 8px; padding: 10px; font-size: 12px; line-height: 1.5; color: #fca5a5; }
+    .info-box { background: rgba(2, 132, 199, 0.15); border: 1px solid var(--primary); border-radius: 8px; padding: 10px; font-size: 12px; line-height: 1.5; color: #7dd3fc; }
+
+    /* 利益計算 */
+    .calc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+    .calc-row label { font-size: 11px; color: var(--text-sub); }
+    .profit-display { font-size: 15px; font-weight: 700; color: var(--success); text-align: right; margin-top: 6px; }
+    
+    .loading { display: none; text-align: center; padding: 16px; color: var(--accent); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 入力・スキャンカード -->
+  <div class="card">
+    <h2>専門書・実務書 瞬殺スキャナー</h2>
+    
+    <!-- カメラスキャン起動ボタン -->
+    <button class="btn btn-block btn-scanner" id="btnToggleCamera" onclick="toggleCamera()">
+      📷 バーコードスキャナー起動 (カメラ)
+    </button>
+    
+    <!-- カメラ枠 -->
+    <div id="reader-wrapper">
+      <div id="reader"></div>
+    </div>
+
+    <!-- 手動入力（バックアップ用） -->
+    <div style="display:flex; gap:8px;">
+      <input type="text" id="isbnInput" placeholder="ISBN (978...) または手打ち" pattern="[0-9xX\-]*">
+      <button class="btn" onclick="fetchBookData(document.getElementById('isbnInput').value)">査定</button>
+    </div>
+
+    <!-- コンディション & 版数チェック（完全防壁トグル） -->
+    <div class="checkbox-group">
+      <label class="checkbox-label safe-check">
+        <input type="checkbox" id="chkLatest"> 最新版と確認済
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkWritingText"> 解説に線引き/マーカー
+      </label>
+      <label class="checkbox-label danger-check">
+        <input type="checkbox" id="chkWritingQuiz"> 過去問/問題に書込み
+      </label>
+      <label class="checkbox-label danger-check">
+        <input type="checkbox" id="chkMissingFatal"> 解答/コード/必須CD欠品
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkLibrary"> 図書館除籍本(印/シール)
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkMissingSub"> 軽微な付属欠品
+      </label>
+    </div>
+  </div>
+
+  <!-- ローディング -->
+  <div class="loading" id="loading">📚 OpenBD書誌データベース照合中...</div>
+
+  <!-- 査定結果表示エリア -->
+  <div class="card result-box" id="resultCard">
+    <div class="badge-row">
+      <span class="badge" id="resRank">判定</span>
+      <span style="font-size:12px; color:var(--text-sub);" id="resPubDate">発行年</span>
+    </div>
+
+    <!-- 書籍メタ情報 -->
+    <div class="book-meta">
+      <div><b>書名:</b> <span id="resTitle">--</span></div>
+      <div><b>出版社:</b> <span id="resPublisher">--</span></div>
+      <div><b>本体定価:</b> <span id="resPrice">--</span> 円 (税込)</div>
+    </div>
+
+    <!-- リスク・トラップ警告 -->
+    <div class="warning-box" id="resWarning" style="display:none;"></div>
+
+    <!-- 需要期・サイクル情報 -->
+    <div class="info-box" id="resCycle"></div>
+
+    <!-- 利益計算シミュレーター -->
+    <div class="card" style="background:#0f172a; border:none; padding:10px;">
+      <h2>想定利益シミュレーション</h2>
+      <div class="calc-row">
+        <div>
+          <label>想定売価 (自動計算)</label>
+          <input type="number" id="calcSell" oninput="calculateProfit()">
+        </div>
+        <div>
+          <label>仕入れ値 (ブックオフ等)</label>
+          <input type="number" id="calcCost" value="550" oninput="calculateProfit()">
+        </div>
+      </div>
+      <div class="profit-display" id="resProfit">純利益: -- 円 (利益率: --%)</div>
+      <div style="font-size:10px; color:var(--text-sub); text-align:right;">※手数料10%、送料215円（ゆうパケ基準）自動計算</div>
+    </div>
+
+    <!-- メルカリSold直リンク -->
+    <a id="mercariLink" href="#" target="_blank" class="btn btn-block btn-mercari" style="text-decoration:none;">
+      🔍 メルカリ成約相場(Sold)を1秒確認
+    </a>
+  </div>
+</div>
+
+<script>
+  let currentBookData = null;
+  let html5QrCode = null;
+  let isCameraRunning = false;
+
+  // --- カメラスキャン制御 ---
+  async function toggleCamera() {
+    const wrapper = document.getElementById('reader-wrapper');
+    const btn = document.getElementById('btnToggleCamera');
+
+    if (isCameraRunning) {
+      await stopCamera();
+      wrapper.style.display = 'none';
+      btn.innerText = '📷 バーコードスキャナー起動 (カメラ)';
+      btn.style.background = '#10b981';
+      return;
+    }
+
+    wrapper.style.display = 'block';
+    btn.innerText = '⏹️ カメラを停止';
+    btn.style.background = '#ef4444';
+
+    html5QrCode = new Html5Qrcode("reader");
+    const config = {
+      fps: 15,
+      qrbox: { width: 260, height: 140 },
+      aspectRatio: 1.777778
+    };
+
+    try {
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText) => {
+          // 書籍バーコード（上段：978...または979...）を検出
+          if (decodedText.startsWith("978") || decodedText.startsWith("979")) {
+            if (navigator.vibrate) navigator.vibrate(100);
+            document.getElementById('isbnInput').value = decodedText;
+            stopCamera();
+            wrapper.style.display = 'none';
+            btn.innerText = '📷 バーコードスキャナー起動 (カメラ)';
+            btn.style.background = '#10b981';
+            fetchBookData(decodedText);
+          }
+        },
+        (errorMessage) => {}
+      );
+      isCameraRunning = true;
+    } catch (err) {
+      alert("カメラの起動に失敗しました: " + err);
+      wrapper.style.display = 'none';
+      btn.innerText = '📷 バーコードスキャナー起動 (カメラ)';
+      btn.style.background = '#10b981';
+    }
+  }
+
+  async function stopCamera() {
+    if (html5QrCode && isCameraRunning) {
+      await html5QrCode.stop();
+      isCameraRunning = false;
+    }
+  }
+
+  // --- 書籍データ取得 & 査定 ---
+  async function fetchBookData(rawIsbn) {
+    let isbn = rawIsbn.trim().replace(/[-\s]/g, '');
+    if (!isbn) return alert('ISBNを入力してください');
+
+    const loading = document.getElementById('loading');
+    const resultCard = document.getElementById('resultCard');
+    loading.style.display = 'block';
+    resultCard.style.display = 'none';
+
+    try {
+      const res = await fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`);
+      const data = await res.json();
+
+      if (!data || !data[0] || !data[0].summary) {
+        throw new Error('OpenBDに書籍データがありません。手動でタイトルをご確認ください。');
+      }
+
+      const summary = data[0].summary;
+      const onix = data[0].onix;
+
+      let price = 0;
+      if (data[0].onix && onix.ProductSupply && onix.ProductSupply.SupplyDetail) {
+        try {
+          const prices = onix.ProductSupply.SupplyDetail.Price;
+          if (Array.isArray(prices) && prices.length > 0) {
+            price = parseInt(prices[0].PriceAmount);
+          } else if (prices && prices.PriceAmount) {
+            price = parseInt(prices.PriceAmount);
+          }
+        } catch(e) {}
+      }
+      if (!price || price === 0) price = 3000;
+
+      currentBookData = {
+        isbn: summary.isbn,
+        title: summary.title || '',
+        publisher: summary.publisher || '',
+        pubdate: summary.pubdate || '',
+        price: price
+      };
+
+      runAssessmentLogic();
+      loading.style.display = 'none';
+      resultCard.style.display = 'flex';
+
+    } catch (err) {
+      loading.style.display = 'none';
+      alert('取得エラー: ' + err.message);
+    }
+  }
+
+  function runAssessmentLogic() {
+    if (!currentBookData) return;
+
+    const b = currentBookData;
+    const isLatest = document.getElementById('chkLatest').checked;
+    const hasWritingText = document.getElementById('chkWritingText').checked;
+    const hasWritingQuiz = document.getElementById('chkWritingQuiz').checked;
+    const hasMissingFatal = document.getElementById('chkMissingFatal').checked;
+    const isLibrary = document.getElementById('chkLibrary').checked;
+    const hasMissingSub = document.getElementById('chkMissingSub').checked;
+
+    let warnings = [];
+    let cycleInfo = [];
+    let rank = "B";
+    let rankText = "B (要検討)";
+    let estimatedPrice = 0;
+
+    // ① キルスイッチ（即死判定：販売不可）
+    if (hasWritingQuiz) {
+      setResultUI("D", "D (仕入れ不可)", 0, "⚠️ 【即時キル】問題集・過去問への直接書き込みがあるため実質販売不可です。", "学習書としての価値が失われています。");
+      return;
+    }
+    if (hasMissingFatal) {
+      setResultUI("D", "D (仕入れ不可)", 0, "⚠️ 【即時キル】解答冊子・必須CD・コード欠品のためクレーム・返品対象になります。", "主要付属品の欠落により再販不可です。");
+      return;
+    }
+
+    // ② 出版社・ジャンル残価率判定（完全合格仕様：70%枠の完全網羅）
+    let baseRate = 0.40;
+    const p = b.publisher;
+    const t = b.title;
+
+    const tier70_medical = ["医学書院", "南江堂", "メジカルビュー社", "羊土社", "へるす出版", "金原出版", "中外医学社", "じほう"];
+    const tier70_law_welfare_psy = [
+      "辰已法律", "有斐閣", "弘文堂", "日本加除出版", "商事法務",
+      "中央法規", "全国社会福祉協議会", "明石書店", "ミネルヴァ書房",
+      "金剛出版", "金子書房", "誠信書房", "星和書店", "創元社", "岩崎学術", "北大路書房"
+    ];
+    const tier70_oreilly = ["オライリー", "O'Reilly"];
+    const tier65_humanities = ["みすず書房", "岩波書店", "東京大学出版会", "吉川弘文館", "青土社"];
+    const tier55_tech = ["技術評論社", "翔泳社", "日経BP", "オーム社", "リックテレコム", "インプレス", "秀和システム"];
+
+    const isMedical = tier70_medical.some(x => p.includes(x));
+    const isLawWelfarePsy = tier70_law_welfare_psy.some(x => p.includes(x));
+    const isOReilly = tier70_oreilly.some(x => p.includes(x));
+    const isHumanities = tier65_humanities.some(x => p.includes(x));
+    const isTech = tier55_tech.some(x => p.includes(x));
+    const isHardTAC = p.includes("TAC") && ["税理士", "会計士", "社労士", "簿記1級", "鑑定士"].some(x => t.includes(x));
+
+    let needLatestCheck = false;
+
+    if (isMedical || isLawWelfarePsy || isOReilly) {
+      baseRate = 0.70;
+      needLatestCheck = true;
+    } else if (isHardTAC) {
+      baseRate = 0.65;
+      needLatestCheck = true;
+    } else if (isHumanities) {
+      baseRate = 0.65;
+    } else if (isTech) {
+      baseRate = 0.55;
+      needLatestCheck = true;
+    }
+
+    // ③ ホワイトリスト方式（最新版未確認フェイルセーフ）
+    if (needLatestCheck && !isLatest) {
+      warnings.push("⚠️ 【注意】医療・法律・資格・ITは版改訂による旧版暴落リスクがあります。「最新版と確認済」にチェックがないため、安全策として低額査定に制限しています。最新版であることを確認したらチェックを入れてください。");
+      baseRate = 0.20;
+    }
+
+    // ④ 月別需要サイクル（行政書士と宅建を完全分離）
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const day = now.getDate();
+    let seasonRate = 1.0;
+
+    // 宅建・秋期情報処理（10月第3週試験）
+    if (t.includes("宅建") || t.includes("情報処理")) {
+      if (month === 8 || month === 9) {
+        seasonRate = 1.15;
+        cycleInfo.push("📅 【直前特需期】秋期試験直前のため高回転・高単価相場です。");
+      } else if ((month === 10 && day >= 15) || month === 11 || month === 12) {
+        seasonRate = 0.35;
+        warnings.push("⚠️ 【暴落期】秋期試験直前〜終了後のため相場暴落中。売り切り推奨・仕入れ非推奨です。");
+      }
+    }
+    // 行政書士（11月第2週試験：10月ピーク維持！）
+    else if (t.includes("行政書士")) {
+      if (month === 9 || month === 10) {
+        seasonRate = 1.15;
+        cycleInfo.push("📅 【直前追い込みピーク】11月試験に向け、10月は年間で最も高値で即売れするボーナス月です！");
+      } else if ((month === 11 && day >= 15) || month === 12) {
+        seasonRate = 0.35;
+        warnings.push("⚠️ 【本試験終了】行政書士本試験が終了したため、相場が暴落期に入っています。");
+      }
+    }
+    // 電験三種（年2回特需）
+    else if (t.includes("電験")) {
+      if ((month === 1 || month === 2) || (month === 7 || month === 8)) {
+        seasonRate = 1.15;
+        cycleInfo.push("📅 【電験特需期】直前期につき需要急増中。安定高値で狙えます。");
+      }
+    }
+    // ケアマネジャー（12〜1月研修特需）
+    else if (t.includes("ケアマネ") || t.includes("介護支援専門員")) {
+      if (month === 12 || month === 1) {
+        seasonRate = 1.15;
+        cycleInfo.push("📅 【研修特需期】合格発表後の実務研修テキスト需要により高騰・即売れ期です。");
+      }
+    }
+    // 医療・福祉国試（12〜4月特需）
+    else if (isMedical || p.includes("中央法規")) {
+      if (month >= 12 || month <= 4) {
+        seasonRate = 1.15;
+        cycleInfo.push("📅 【国試・新年度特需】国家試験直前〜新入職研修に向けた年間最高値シーズンです。");
+      }
+    }
+
+    // ⑤ コンディション減額
+    let condRate = 1.0;
+    if (hasWritingText) {
+      condRate *= 0.75;
+      warnings.push("・解説・マニュアルへの線引きあり（25%減額）");
+    }
+    if (isLibrary) {
+      condRate *= 0.50;
+      warnings.push("・図書館除籍本（印・シールありのため50%減額・出品時要明記）");
+    }
+    if (hasMissingSub) {
+      condRate *= 0.60;
+      warnings.push("・軽微な付属品欠品（40%減額）");
+    }
+
+    // ⑥ 現場トラップ警告（分冊・単巻、正誤表）
+    if (["上", "下", "巻", "大系", "コンメンタール"].some(x => t.includes(x))) {
+      warnings.push("⚠️ 【単巻トラップ警告】タイトルに分冊表記があります。全巻セットでない単巻のみの販売は回転低下・価格下落リスクがあります。");
+    }
+
+    // 最終売価計算
+    estimatedPrice = Math.round((b.price * baseRate * seasonRate * condRate) / 10) * 10;
+
+    // ランク付け
+    if (estimatedPrice >= 2500 && isLatest) {
+      rank = "S"; rankText = "S (即仕入れ推奨)";
+    } else if (estimatedPrice >= 1800) {
+      rank = "A"; rankText = "A (仕入れ推奨)";
+    } else if (estimatedPrice >= 1000) {
+      rank = "B"; rankText = "B (利益薄・要確認)";
+    } else {
+      rank = "D"; rankText = "D (仕入れ見送り/利益薄)";
+    }
+
+    setResultUI(rank, rankText, estimatedPrice, warnings.join('<br>'), cycleInfo.join('<br>') || "年間通じて安定需要の専門書です。");
+  }
+
+  function setResultUI(rank, rankText, price, warningHtml, cycleHtml) {
+    const resRank = document.getElementById('resRank');
+    resRank.className = `badge rank-${rank}`;
+    resRank.innerText = rankText;
+
+    document.getElementById('resTitle').innerText = currentBookData.title;
+    document.getElementById('resPublisher').innerText = currentBookData.publisher;
+    document.getElementById('resPrice').innerText = currentBookData.price.toLocaleString();
+    document.getElementById('resPubDate').innerText = currentBookData.pubdate ? `発行: ${currentBookData.pubdate}` : '';
+
+    const warnBox = document.getElementById('resWarning');
+    if (warningHtml) {
+      warnBox.innerHTML = warningHtml;
+      warnBox.style.display = 'block';
+    } else {
+      warnBox.style.display = 'none';
+    }
+
+    document.getElementById('resCycle').innerHTML = cycleHtml;
+    document.getElementById('calcSell').value = price;
+
+    const query = encodeURIComponent(`${currentBookData.title}`);
+    document.getElementById('mercariLink').href = `https://jp.mercari.com/search?keyword=${query}&status=sold_out&sort=created_time&order=desc`;
+
+    calculateProfit();
+  }
+
+  function calculateProfit() {
+    const sell = parseInt(document.getElementById('calcSell').value) || 0;
+    const cost = parseInt(document.getElementById('calcCost').value) || 0;
+    const fee = Math.floor(sell * 0.1);
+    const shipping = 215;
+    const netProfit = sell - fee - shipping - cost;
+    const margin = sell > 0 ? Math.round((netProfit / sell) * 100) : 0;
+    
+    const profitEl = document.getElementById('resProfit');
+    profitEl.innerText = `純利益: ${netProfit.toLocaleString()} 円 (利益率: ${margin}%)`;
+    profitEl.style.color = netProfit > 0 ? 'var(--success)' : 'var(--danger)';
+  }
+
+  document.querySelectorAll('.checkbox-group input').forEach(input => {
+    input.addEventListener('change', runAssessmentLogic);
+  });
+</script>
+
+</body>
+</html>
