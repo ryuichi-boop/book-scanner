@@ -206,7 +206,7 @@ let scannedBooks = [];
 let html5QrCode = null;
 let isCameraActive = false;
 
-// 1. 出版社別残価率
+// 出版社別残価率
 const PUB_RATES = {
   "医学書院": 0.70, "南江堂": 0.70, "へるす出版": 0.70, "辰已法律研究所": 0.70,
   "有斐閣": 0.70, "弘文堂": 0.70, "日本加除出版": 0.70, "商事法務": 0.70,
@@ -398,14 +398,14 @@ function recalculate() {
     totalEstimatedSell += itemSell;
   });
 
-  // セットボーナス（2冊以上揃っている場合、セット価値で1.1倍換算）
+  // セットボーナス
   if (scannedBooks.length > 1) {
     totalEstimatedSell *= 1.1;
   }
 
   // コンディション減額
   if (chkCd || chkWrite) {
-    totalEstimatedSell *= 0.3; // キルスイッチ
+    totalEstimatedSell *= 0.3;
   } else {
     if (chkLine) totalEstimatedSell *= 0.75;
     if (chkLib) totalEstimatedSell *= 0.50;
@@ -421,7 +421,6 @@ function manualRecalc() {
   const cost = parseFloat(document.getElementById("input-cost").value) || 0;
   const bookCount = scannedBooks.length;
 
-  // 送料判定 (1冊=ゆうパケ215円、2冊=宅急便コンパクト520円、3冊以上=60サイズ750円)
   let shipping = 215;
   let shipName = "ゆうパケ215円";
   if (bookCount === 2) {
@@ -443,7 +442,7 @@ function manualRecalc() {
   profitEl.textContent = `純利益: ${profit.toLocaleString()} 円 (${profitMargin}%)`;
   profitEl.className = profit >= 1000 ? "profit-display profit-plus" : "profit-display profit-minus";
 
-  // ランク付け
+  // ランク判定
   const rankEl = document.getElementById("rank-badge");
   if (profit >= 2500 && profitMargin >= 35) {
     rankEl.className = "badge-rank rank-S";
@@ -462,17 +461,20 @@ function manualRecalc() {
     rankEl.textContent = "D (見送り/赤字)";
   }
 
-  // メルカリURL生成（ブラウザ強制 ＆ 売り切れ・取引中のみに厳密固定）
+  // メルカリURL生成（売り切れ・新しい順をダイレクト指定）
   if (scannedBooks.length > 0) {
+    // 記号を除去してメインタイトルを抽出
     let cleanTitles = scannedBooks.map(b => {
-      let t = b.title.replace(/[!！\.。、,]/g, " ").trim();
+      let t = b.title.replace(/[!！\.。、,\(\)（）]/g, " ").trim();
       return t.split(" ")[0];
     });
-    let q = cleanTitles.join(" ");
+    // 重複した単語を除去
+    let uniqueWords = [...new Set(cleanTitles)];
+    let q = uniqueWords.join(" ");
     if (scannedBooks.length > 1) q += " セット";
     
-    // アプリへの強制ディープリンクを回避し、Web版ブラウザ上で売り切れ（Sold）を確実に開くURL構造
-    const mercariUrl = `https://jp.mercari.com/search?keyword=${encodeURIComponent(q)}&status=trading_and_sold_out&item_condition_id=1&ref=web_search_filter`;
+    // status_trading_sold_out=1 と order=desc（新しい順）のみを指定
+    const mercariUrl = `https://jp.mercari.com/search?keyword=${encodeURIComponent(q)}&status_trading_sold_out=1&order=desc`;
     document.getElementById("btn-mercari-link").href = mercariUrl;
   }
 }
