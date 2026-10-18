@@ -416,6 +416,23 @@ function recalculate() {
   manualRecalc();
 }
 
+// タイトルから検索に最適なクリーンキーワードを抽出する関数
+function extractStrongKeywords(title) {
+  // 記号（!、・、/、( )など）を半角スペースに変換
+  let cleaned = title.replace(/[!！\?？\・\/\-\_\:\;~〜\(\)（）\[\]【】\.\,]/g, " ");
+  // 単語に分解して空文字を除外
+  let words = cleaned.split(/\s+/).filter(w => w.length > 0);
+  
+  if (words.length === 0) return title;
+  
+  // 先頭から主要な単語を2〜3語ピックアップ（シリーズ名＋資格・科目名＋版数など）
+  let strongParts = [];
+  for (let i = 0; i < Math.min(words.length, 3); i++) {
+    strongParts.push(words[i]);
+  }
+  return strongParts.join(" ");
+}
+
 function manualRecalc() {
   const sell = parseFloat(document.getElementById("input-sell").value) || 0;
   const cost = parseFloat(document.getElementById("input-cost").value) || 0;
@@ -461,19 +478,21 @@ function manualRecalc() {
     rankEl.textContent = "D (見送り/赤字)";
   }
 
-  // メルカリURL生成（売り切れ・新しい順をダイレクト指定）
+  // メルカリURL生成（強化版検索クエリ）
   if (scannedBooks.length > 0) {
-    // 記号を除去してメインタイトルを抽出
-    let cleanTitles = scannedBooks.map(b => {
-      let t = b.title.replace(/[!！\.。、,\(\)（）]/g, " ").trim();
-      return t.split(" ")[0];
-    });
-    // 重複した単語を除去
-    let uniqueWords = [...new Set(cleanTitles)];
-    let q = uniqueWords.join(" ");
-    if (scannedBooks.length > 1) q += " セット";
-    
-    // status_trading_sold_out=1 と order=desc（新しい順）のみを指定
+    let q = "";
+    if (scannedBooks.length === 1) {
+      // 1冊の場合：主要タイトル＋版数まで含めて精度を最大化
+      q = extractStrongKeywords(scannedBooks[0].title);
+    } else {
+      // 複数冊（セット）の場合：1冊目の主要部 ＋ 2冊目の補足 ＋ セット
+      let k1 = extractStrongKeywords(scannedBooks[0].title);
+      let k2 = extractStrongKeywords(scannedBooks[1].title);
+      // 重複単語を整理してまとめる
+      let combined = [...new Set((k1 + " " + k2).split(" "))].slice(0, 4).join(" ");
+      q = combined + " セット";
+    }
+
     const mercariUrl = `https://jp.mercari.com/search?keyword=${encodeURIComponent(q)}&status_trading_sold_out=1&order=desc`;
     document.getElementById("btn-mercari-link").href = mercariUrl;
   }
